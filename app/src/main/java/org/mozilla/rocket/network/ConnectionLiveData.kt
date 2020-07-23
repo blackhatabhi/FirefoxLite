@@ -9,12 +9,15 @@ import android.net.NetworkInfo
 import android.net.NetworkRequest
 import android.os.Build
 import androidx.lifecycle.LiveData
+import java.util.concurrent.atomic.AtomicBoolean
 
 class ConnectionLiveData(val context: Context) : LiveData<Boolean>() {
 
     private var connectivityManager: ConnectivityManager = context.getSystemService(CONNECTIVITY_SERVICE) as ConnectivityManager
 
     private lateinit var connectivityManagerCallback: ConnectivityManager.NetworkCallback
+
+    private val mCurrentNetworkStatus = AtomicBoolean(false)
 
     override fun onActive() {
         super.onActive()
@@ -41,11 +44,15 @@ class ConnectionLiveData(val context: Context) : LiveData<Boolean>() {
     private fun getConnectivityManagerCallback(): ConnectivityManager.NetworkCallback {
         connectivityManagerCallback = object : ConnectivityManager.NetworkCallback() {
             override fun onAvailable(network: Network?) {
-                postValue(true)
+                if (mCurrentNetworkStatus.compareAndSet(false, true)) {
+                    postValue(true)
+                }
             }
 
             override fun onLost(network: Network?) {
-                postValue(false)
+                if (mCurrentNetworkStatus.compareAndSet(true, false)) {
+                    postValue(false)
+                }
             }
         }
         return connectivityManagerCallback
@@ -53,6 +60,7 @@ class ConnectionLiveData(val context: Context) : LiveData<Boolean>() {
 
     private fun updateConnection() {
         val activeNetwork: NetworkInfo? = connectivityManager.activeNetworkInfo
+        mCurrentNetworkStatus.set(activeNetwork?.isConnected == true)
         postValue(activeNetwork?.isConnected == true)
     }
 }
